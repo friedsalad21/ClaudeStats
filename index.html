@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaudeStats</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b0a12; --card:rgba(255,255,255,.045); --line:rgba(255,255,255,.09);
+  --text:#ece9f5; --mut:#9a95ad; --acc:#e07a5f; --acc2:#9b7bff; --acc3:#4fd1c5; --gold:#f2c14e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh;overflow-x:hidden}
+body::before,body::after{content:"";position:fixed;z-index:-1;border-radius:50%;filter:blur(110px);opacity:.35;pointer-events:none}
+body::before{width:520px;height:520px;background:var(--acc);top:-160px;left:-120px}
+body::after{width:600px;height:600px;background:var(--acc2);bottom:-220px;right:-160px}
+.wrap{max-width:1240px;margin:0 auto;padding:22px 16px 60px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+h1{margin:0;font-size:28px;letter-spacing:-.02em}
+h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mut);font-size:13px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:8px 13px;font:inherit;font-size:14px;cursor:pointer;transition:.15s}
+button:hover,.btn:hover{background:rgba(255,255,255,.13)}
+button.pri{background:linear-gradient(135deg,var(--acc),#c25a8a);border:0}
+button.on{background:rgba(155,123,255,.3);border-color:var(--acc2)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 40px rgba(0,0,0,.25);min-width:0}
+.card h2{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.grid{display:grid;gap:14px;margin-bottom:14px}
+.tiles{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.two{grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))}
+.tile .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.tile .v{font-size:30px;font-weight:700;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .d{color:var(--mut);font-size:12px;margin-top:2px}
+.tile.hero{grid-column:span 2;background:linear-gradient(135deg,rgba(224,122,95,.22),rgba(155,123,255,.18))}
+.tile.hero .v{font-size:44px;background:linear-gradient(90deg,#fff,#ffd3c4);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media(max-width:420px){.tile.hero{grid-column:span 1}.tile .v{font-size:26px}.tile.hero .v{font-size:36px}}
+.seg{display:inline-flex;gap:4px}.seg button{padding:4px 10px;font-size:12px;text-transform:none;letter-spacing:0}
+.range{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+input[type=date]{background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:7px 9px;font:inherit;font-size:14px;color-scheme:dark}
+.chartbox{position:relative;height:300px}
+.donutbox{position:relative;height:240px}
+.bars .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;margin-bottom:9px;font-size:14px}
+.bars .row .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bars .row .x{color:var(--mut);font-variant-numeric:tabular-nums}
+.bars .bar{grid-column:1/-1;height:6px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.bars .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.heat{overflow-x:auto;padding-bottom:4px}
+.year{display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;grid-auto-columns:12px;gap:3px;width:max-content}
+.months{display:grid;grid-auto-flow:column;grid-auto-columns:12px;gap:3px;font-size:10px;color:var(--mut);height:14px;width:max-content}
+.months span{white-space:nowrap;overflow:visible;width:12px}
+.cell{border-radius:3px;background:rgba(255,255,255,.06)}
+.hours{display:grid;grid-template-columns:34px repeat(24,minmax(12px,1fr));gap:3px;font-size:10px;color:var(--mut);min-width:420px}
+.hours .cell{aspect-ratio:1}
+.legend{display:flex;gap:4px;align-items:center;font-size:11px;color:var(--mut);margin-top:8px}
+.legend .cell{width:12px;height:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;background:rgba(242,193,78,.18);color:var(--gold);margin-left:6px}
+.gauge{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.ring{--p:0;width:130px;height:130px;border-radius:50%;background:conic-gradient(var(--acc3) calc(var(--p)*1%),rgba(255,255,255,.07) 0);display:grid;place-items:center;transition:--p 1s}
+.ring div{width:100px;height:100px;border-radius:50%;background:#15131f;display:grid;place-items:center;font-size:24px;font-weight:700}
+#empty{max-width:720px;margin:40px auto;text-align:center}
+.drop{border:2px dashed rgba(255,255,255,.2);border-radius:18px;padding:34px 18px;margin:18px 0;transition:.15s}
+.drop.over{border-color:var(--acc);background:rgba(224,122,95,.08)}
+code{background:rgba(255,255,255,.08);padding:2px 6px;border-radius:6px;font-size:13px;word-break:break-all}
+ol{text-align:left;color:var(--mut);max-width:560px;margin:10px auto}
+ol li{margin:6px 0}
+.priv{display:inline-flex;gap:6px;align-items:center;color:var(--acc3);font-size:13px}
+#status{color:var(--mut);font-size:13px;min-height:18px}
+.hidden{display:none!important}
+footer{color:var(--mut);font-size:12px;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1><span>Claude</span>Stats</h1>
+    <div class="sub" id="meta">Your personal Claude Code usage dashboard</div>
+  </div>
+  <div class="btns">
+    <button class="pri" id="pick">📁 Import folder</button>
+    <button id="sample">✨ Load sample data</button>
+    <button id="clear" class="hidden">Clear</button>
+  </div>
+</header>
+<input type="file" id="dir" webkitdirectory multiple class="hidden">
+<div id="status"></div>
+
+<section id="empty">
+  <div class="priv">🔒 Your data never leaves your browser. Files are parsed locally; nothing is uploaded.</div>
+  <div class="drop" id="drop">
+    <div style="font-size:40px">🗂️</div>
+    <p><b>Drop your <code>.claude\projects</code> folder here</b><br><span class="sub">or use “Import folder”</span></p>
+  </div>
+  <ol>
+    <li>Click <b>Import folder</b>.</li>
+    <li>The <code>.claude</code> folder is hidden on Windows, so paste <code>%USERPROFILE%\.claude</code> into the folder picker's address bar and press Enter. (macOS/Linux: <code>~/.claude</code>; press <code>Cmd+Shift+.</code> to show hidden folders on a Mac.)</li>
+    <li>Select the <code>projects</code> folder and confirm. The browser may ask whether to “upload” it: that's its standard wording, the files stay on your computer.</li>
+  </ol>
+  <p class="sub">The computed summary is cached in this browser, so a reload won't need the folder again. Use <b>Import folder</b> again to refresh.</p>
+</section>
+
+<main id="dash" class="hidden">
+  <div class="range">
+    <span class="seg" id="presets">
+      <button data-d="7">7D</button><button data-d="30">30D</button><button data-d="90">90D</button><button data-d="365">1Y</button><button data-d="0">All</button>
+    </span>
+    <input type="date" id="from"> <span class="sub">→</span> <input type="date" id="to">
+  </div>
+
+  <div class="grid tiles">
+    <div class="card tile hero"><div class="k">API-equivalent cost</div><div class="v" id="tCost">–</div><div class="d">what this usage would cost at Anthropic API list prices</div></div>
+    <div class="card tile"><div class="k">Total tokens</div><div class="v" id="tTok">–</div><div class="d" id="tTokD"></div></div>
+    <div class="card tile"><div class="k">API requests</div><div class="v" id="tReq">–</div><div class="d" id="tReqD"></div></div>
+    <div class="card tile"><div class="k">Sessions</div><div class="v" id="tSes">–</div><div class="d" id="tSesD"></div></div>
+    <div class="card tile"><div class="k">Prompts</div><div class="v" id="tPro">–</div><div class="d" id="tProD"></div></div>
+    <div class="card tile"><div class="k">Active days</div><div class="v" id="tDays">–</div><div class="d" id="tDaysD"></div></div>
+    <div class="card tile"><div class="k">Current streak 🔥</div><div class="v" id="tStr">–</div><div class="d" id="tStrD"></div></div>
+  </div>
+
+  <div class="grid tiles">
+    <div class="card tile"><div class="k">Input</div><div class="v" id="tIn">–</div></div>
+    <div class="card tile"><div class="k">Output</div><div class="v" id="tOut">–</div></div>
+    <div class="card tile"><div class="k">Cache read</div><div class="v" id="tCr">–</div></div>
+    <div class="card tile"><div class="k">Cache write</div><div class="v" id="tCw">–</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <h2>Cost &amp; tokens over time <span class="seg" id="gran"><button data-g="d" class="on">Daily</button><button data-g="w">Weekly</button><button data-g="m">Monthly</button></span></h2>
+    <div class="chartbox"><canvas id="cTime"></canvas></div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <h2>Your year <span class="sub" id="yearSum" style="text-transform:none;letter-spacing:0"></span></h2>
+    <div class="heat"><div class="months" id="months"></div><div class="year" id="year"></div></div>
+    <div class="legend">Less <span class="cell l0"></span><span class="cell l1"></span><span class="cell l2"></span><span class="cell l3"></span><span class="cell l4"></span> More (by cost)</div>
+  </div>
+
+  <div class="grid two">
+    <div class="card"><h2>When you work <span class="sub" style="text-transform:none;letter-spacing:0">requests by hour</span></h2><div class="heat"><div class="hours" id="hours"></div></div></div>
+    <div class="card"><h2>Caching</h2>
+      <div class="gauge">
+        <div class="ring" id="ring"><div id="ringV">–</div></div>
+        <div>
+          <div class="sub">Cache hit rate</div>
+          <div class="sub" style="margin-top:10px">Money caching saved</div>
+          <div style="font-size:30px;font-weight:700;color:var(--acc3)" id="saved">–</div>
+          <div class="sub" id="savedD"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid two">
+    <div class="card"><h2>By model</h2><div class="donutbox"><canvas id="cModel"></canvas></div><div class="bars" id="models" style="margin-top:14px"></div></div>
+    <div class="card"><h2>By project</h2><div class="bars" id="projects"></div></div>
+  </div>
+
+  <div class="grid two">
+    <div class="card"><h2>Top tools</h2><div class="bars" id="tools"></div></div>
+    <div class="card"><h2>By entrypoint</h2><div class="bars" id="entries"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Most expensive sessions</h2>
+    <div class="tablewrap"><table><thead><tr><th>Date</th><th>Project</th><th>Model</th><th class="r">Requests</th><th class="r">Tokens</th><th class="r">Cost</th></tr></thead><tbody id="sessions"></tbody></table></div>
+  </div>
+  <footer>🔒 Parsed locally from your Claude Code transcripts · prices are Anthropic API list prices (USD) · <span id="src"></span></footer>
+</main>
+</div>
+
+<script>
+// ---------- pricing (USD / 1M tokens). [prefix, input, output, cacheRead?, fast?]. First prefix match wins.
+const PRICES = [
+  ['claude-fable-5-1', 10, 50, 0.25],
+  ['claude-fable-5',   10, 50, 1.00],
+  ['claude-opus-5-5',   4, 20, 0.20, [8, 40]],
+  ['claude-opus-5',     5, 25], ['claude-opus-4-8', 5, 25], ['claude-opus-4-7', 5, 25], ['claude-opus-4-6', 5, 25],
+  ['claude-sonnet-5-5', 2, 10, 0.20],
+  ['claude-sonnet-5',   2, 10],
+  ['claude-sonnet-4-6', 3, 15],
+  ['claude-haiku-4-5',  1, 5],
+];
+const priceOf = m => PRICES.find(p => m.startsWith(p[0])) || null;
+// returns [actual cost, cost if nothing had been cached]
+function costOf(r) {
+  const p = priceOf(D.models[r.m]); if (!p) return [0, 0];
+  let [, inp, out, cr, fast] = p;
+  if (r.f && fast) [inp, out] = fast;
+  cr = cr ?? inp * 0.1;
+  const c = (r.i * inp + r.o * out + r.cr * cr + r.w5 * inp * 1.25 + r.w1 * inp * 2) / 1e6;
+  const raw = ((r.i + r.cr + r.w5 + r.w1) * inp + r.o * out) / 1e6;
+  return [c, raw];
+}
+
+// ---------- data model: D = {models,projects,entries,tools: string[], req: [[tMin,s,p,m,e,i,o,cr,w5,w1,fast,[tools]]], prompts:[[tMin,s]], src}
+let D = null, R = [], P = [];
+const KEY = 'claudestats-v1';
+const $ = id => document.getElementById(id);
+const status = t => $('status').textContent = t;
+
+function intern(arr, map, v) { let i = map.get(v); if (i === undefined) { i = arr.length; arr.push(v); map.set(v, i); } return i; }
+
+async function importFiles(files) {
+  files = files.filter(f => f.name.endsWith('.jsonl'));
+  if (!files.length) return status('No .jsonl files found. Pick the .claude\\projects folder.');
+  const out = { models: [], projects: [], entries: [], tools: [], req: [], prompts: [] };
+  const mm = new Map(), pm = new Map(), em = new Map(), tm = new Map(), sm = new Map(), sids = [];
+  const msgs = new Map(), toolsByMsg = new Map(), seenTool = new Set(), seenPrompt = new Set();
+  let lines = 0, bytes = 0, total = files.reduce((a, f) => a + f.size, 0);
+  for (const f of files) {
+    const text = await f.text();
+    bytes += f.size; status(`Parsing ${files.length} files… ${Math.round(bytes / total * 100)}%`);
+    for (const line of text.split('\n')) {
+      if (!line.includes('"assistant"') && !line.includes('"user"')) continue;
+      let o; try { o = JSON.parse(line); } catch { continue; }
+      lines++;
+      const t = Math.floor(Date.parse(o.timestamp) / 60000); if (!t) continue;
+      const s = intern(sids, sm, o.sessionId || f.name);
+      if (o.type === 'assistant') {
+        const m = o.message; if (!m || !m.id) continue;
+        for (const b of m.content || []) if (b.type === 'tool_use' && b.name && !seenTool.has(b.id)) {
+          seenTool.add(b.id);
+          (toolsByMsg.get(m.id) || toolsByMsg.set(m.id, []).get(m.id)).push(intern(out.tools, tm, b.name));
+        }
+        const u = m.usage; if (!u || !m.model || m.model === '<synthetic>') continue;
+        const prev = msgs.get(m.id); // one response is split over several lines with the same id+usage: count it once
+        if (prev) { prev[6] = Math.max(prev[6], u.output_tokens || 0); continue; }
+        const cw = u.cache_creation_input_tokens || 0, cc = u.cache_creation;
+        let w1 = cc ? cc.ephemeral_1h_input_tokens || 0 : 0, w5 = cw - w1;
+        const proj = (o.cwd || '?').split(/[\\/]/).filter(Boolean).pop() || o.cwd || '?';
+        msgs.set(m.id, [t, s, intern(out.projects, pm, proj), intern(out.models, mm, m.model), intern(out.entries, em, o.entrypoint || 'unknown'),
+          u.input_tokens || 0, u.output_tokens || 0, u.cache_read_input_tokens || 0, Math.max(0, w5), w1, u.speed === 'fast' ? 1 : 0]);
+      } else if (o.type === 'user' && !o.isMeta && !o.isSidechain && !seenPrompt.has(o.uuid)) {
+        const c = o.message && o.message.content;
+        const isPrompt = typeof c === 'string' ? !c.startsWith('<local-command') : Array.isArray(c) && c.some(b => b.type === 'text');
+        if (isPrompt) { seenPrompt.add(o.uuid); out.prompts.push([t, s]); }
+      }
+    }
+  }
+  for (const [id, r] of msgs) { r.push(toolsByMsg.get(id) || []); out.req.push(r); }
+  out.req.sort((a, b) => a[0] - b[0]);
+  out.src = `imported ${new Date().toLocaleString()} · ${files.length} files · ${lines.toLocaleString()} lines → ${msgs.size.toLocaleString()} unique API responses`;
+  setData(out, true);
+  status('');
+}
+
+function setData(d, save) {
+  D = d;
+  R = d.req.map(a => ({ t: a[0], s: a[1], p: a[2], m: a[3], e: a[4], i: a[5], o: a[6], cr: a[7], w5: a[8], w1: a[9], f: a[10], tools: a[11] }));
+  for (const r of R) { r.d = new Date(r.t * 60000); r.day = dk(r.d); [r.c, r.raw] = costOf(r); }
+  P = d.prompts.map(a => ({ t: a[0], s: a[1], day: dk(new Date(a[0] * 60000)) }));
+  if (save) try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { status('Summary too large to cache in this browser; you will need to re-import after reload.'); }
+  $('empty').classList.add('hidden'); $('dash').classList.remove('hidden'); $('clear').classList.remove('hidden');
+  $('src').textContent = d.src;
+  const first = R.length ? R[0].day : dk(new Date());
+  $('from').min = $('to').min = first; $('from').value = first; $('to').value = dk(new Date());
+  setPreset('0');
+}
+
+// ---------- helpers
+const pad = n => String(n).padStart(2, '0');
+const dk = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseDay = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const usd = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const compact = v => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
+const tok = r => r.i + r.o + r.cr + r.w5 + r.w1;
+const sum = (a, f) => a.reduce((x, y) => x + f(y), 0);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const prettyModel = m => m.replace(/^claude-/, '').replace(/-(\d+)-(\d+)/, ' $1.$2').replace(/-(\d+)$/, ' $1').replace(/^\w/, c => c.toUpperCase());
+const prettyEntry = e => ({ 'claude-desktop': 'Desktop app', cli: 'CLI', 'sdk-ts': 'Agent SDK (TS)', 'sdk-py': 'Agent SDK (Py)', 'claude-vscode': 'VS Code', web: 'Web' }[e] || e);
+
+function countUp(el, to, fmt) {
+  const from = +el.dataset.v || 0, t0 = performance.now(); el.dataset.v = to;
+  const step = now => { const k = Math.min(1, (now - t0) / 1100), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(from + (to - from) * e); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function bars(id, rows, fmt) {
+  const max = Math.max(...rows.map(r => r[1]), 1e-9);
+  $(id).innerHTML = rows.length ? rows.map(([n, v, extra]) => `<div class="row"><span class="n">${n}</span><span class="x">${fmt(v)}${extra || ''}</span><div class="bar"><i data-w="${v / max * 100}"></i></div></div>`).join('') : '<div class="sub">Nothing in this range</div>';
+  requestAnimationFrame(() => requestAnimationFrame(() => $(id).querySelectorAll('i').forEach(i => i.style.width = i.dataset.w + '%')));
+}
+function group(arr, key) { const m = new Map(); for (const x of arr) { const k = key(x); (m.get(k) || m.set(k, []).get(k)).push(x); } return m; }
+
+// ---------- streaks over a set of day keys
+function streaks(days, endDay) {
+  let longest = 0, run = 0, prev = null;
+  for (const d of [...days].sort()) { run = prev && dk(addDays(parseDay(prev), 1)) === d ? run + 1 : 1; longest = Math.max(longest, run); prev = d; }
+  let cur = 0, d = parseDay(endDay);
+  if (!days.has(dk(d))) d = addDays(d, -1); // today not active yet: streak still counts through yesterday
+  while (days.has(dk(d))) { cur++; d = addDays(d, -1); }
+  return [cur, longest];
+}
+
+// ---------- render
+let gran = 'd', chTime, chModel;
+Chart.defaults.color = '#9a95ad'; Chart.defaults.borderColor = 'rgba(255,255,255,.06)'; Chart.defaults.font.family = 'system-ui,sans-serif';
+const PALETTE = ['#e07a5f', '#9b7bff', '#4fd1c5', '#f2c14e', '#ff6b9d', '#5b9dff', '#8bd17c', '#c792ea'];
+
+function render() {
+  const from = $('from').value, to = $('to').value;
+  const rs = R.filter(r => r.day >= from && r.day <= to), ps = P.filter(p => p.day >= from && p.day <= to);
+  const cost = sum(rs, r => r.c), raw = sum(rs, r => r.raw);
+  const tin = sum(rs, r => r.i), tout = sum(rs, r => r.o), tcr = sum(rs, r => r.cr), tcw = sum(rs, r => r.w5 + r.w1);
+  const days = new Set(rs.map(r => r.day)), sess = new Set(rs.map(r => r.s));
+  const spanDays = Math.round((parseDay(to) - parseDay(from)) / 864e5) + 1;
+  const [cur, longest] = streaks(days, to);
+
+  countUp($('tCost'), cost, usd);
+  countUp($('tTok'), tin + tout + tcr + tcw, compact); $('tTokD').textContent = `${compact(tout)} written by Claude`;
+  countUp($('tReq'), rs.length, v => Math.round(v).toLocaleString()); $('tReqD').textContent = rs.length ? `${usd(cost / rs.length)} avg each` : '';
+  countUp($('tSes'), sess.size, v => Math.round(v).toLocaleString()); $('tSesD').textContent = sess.size ? `${usd(cost / sess.size)} avg each` : '';
+  countUp($('tPro'), ps.length, v => Math.round(v).toLocaleString()); $('tProD').textContent = ps.length ? `${(rs.length / ps.length).toFixed(1)} requests per prompt` : '';
+  countUp($('tDays'), days.size, v => Math.round(v)); $('tDaysD').textContent = `of ${spanDays} days in range`;
+  countUp($('tStr'), cur, v => Math.round(v) + (Math.round(v) === 1 ? ' day' : ' days')); $('tStrD').textContent = `longest: ${longest} day${longest === 1 ? '' : 's'}`;
+  countUp($('tIn'), tin, compact); countUp($('tOut'), tout, compact); countUp($('tCr'), tcr, compact); countUp($('tCw'), tcw, compact);
+
+  // caching
+  const hit = tin + tcr + tcw ? tcr / (tin + tcr + tcw) * 100 : 0;
+  $('ring').style.setProperty('--p', hit.toFixed(1)); $('ringV').textContent = hit.toFixed(1) + '%';
+  countUp($('saved'), raw - cost, usd);
+  $('savedD').textContent = raw ? `without caching this would have cost ${usd(raw)}` : '';
+
+  timeChart(rs, from, to);
+  yearHeat(rs, to);
+  hourHeat(rs);
+
+  // models
+  const byM = [...group(rs, r => r.m)].map(([m, a]) => [D.models[m], sum(a, r => r.c), sum(a, tok)]).sort((a, b) => b[1] - a[1] || b[2] - a[2]);
+  chModel?.destroy();
+  chModel = new Chart($('cModel'), { type: 'doughnut',
+    data: { labels: byM.map(x => prettyModel(x[0])), datasets: [{ data: byM.map(x => x[1] || x[2] / 1e9), backgroundColor: PALETTE, borderColor: '#15131f', borderWidth: 3, hoverOffset: 8 }] },
+    options: { maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'right' }, tooltip: { callbacks: { label: c => ` ${c.label}: ${usd(byM[c.dataIndex][1])}` } } } } });
+  bars('models', byM.map(([m, c, t]) => [esc(prettyModel(m)), c, ` · ${compact(t)} tok${priceOf(m) ? '' : '<span class="pill">unpriced</span>'}`]), usd);
+
+  bars('projects', [...group(rs, r => r.p)].map(([p, a]) => [esc(D.projects[p]), sum(a, r => r.c), ` · ${new Set(a.map(r => r.s)).size} sessions`]).sort((a, b) => b[1] - a[1]).slice(0, 12), usd);
+  bars('entries', [...group(rs, r => r.e)].map(([e, a]) => [esc(prettyEntry(D.entries[e])), a.length, ` requests · ${usd(sum(a, r => r.c))}`]).sort((a, b) => b[1] - a[1]), v => v.toLocaleString());
+  const tc = new Map(); for (const r of rs) for (const t of r.tools) tc.set(t, (tc.get(t) || 0) + 1);
+  bars('tools', [...tc].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([t, n]) => [esc(D.tools[t]), n]), v => v.toLocaleString() + '×');
+
+  // sessions
+  const top = [...group(rs, r => r.s)].map(([s, a]) => {
+    const mc = [...group(a, r => r.m)].sort((x, y) => sum(y[1], r => r.c) - sum(x[1], r => r.c))[0][0];
+    return { d: a[0].d, p: D.projects[a[0].p], m: D.models[mc], n: a.length, tok: sum(a, tok), c: sum(a, r => r.c) };
+  }).sort((a, b) => b.c - a.c).slice(0, 10);
+  $('sessions').innerHTML = top.map(x => `<tr><td>${x.d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} <span class="sub">${pad(x.d.getHours())}:${pad(x.d.getMinutes())}</span></td><td>${esc(x.p)}</td><td>${esc(prettyModel(x.m))}</td><td class="r">${x.n}</td><td class="r">${compact(x.tok)}</td><td class="r"><b>${usd(x.c)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="sub">Nothing in this range</td></tr>';
+  $('meta').textContent = `${from} → ${to}`;
+}
+
+function bucketKey(d) {
+  if (gran === 'm') return dk(d).slice(0, 7);
+  if (gran === 'w') return dk(addDays(d, -((d.getDay() + 6) % 7))); // Monday
+  return dk(d);
+}
+function timeChart(rs, from, to) {
+  const keys = [];
+  for (let d = parseDay(from); dk(d) <= to; d = addDays(d, 1)) { const k = bucketKey(d); if (keys[keys.length - 1] !== k) keys.push(k); }
+  const c = new Map(keys.map(k => [k, 0])), t = new Map(keys.map(k => [k, 0]));
+  for (const r of rs) { const k = bucketKey(r.d); c.set(k, c.get(k) + r.c); t.set(k, t.get(k) + tok(r)); }
+  const ctx = $('cTime').getContext('2d'), g = ctx.createLinearGradient(0, 0, 0, 300);
+  g.addColorStop(0, 'rgba(224,122,95,.95)'); g.addColorStop(1, 'rgba(155,123,255,.35)');
+  chTime?.destroy();
+  chTime = new Chart(ctx, {
+    data: { labels: keys, datasets: [
+      { type: 'bar', label: 'Cost (USD)', data: keys.map(k => c.get(k)), backgroundColor: g, borderRadius: 4, yAxisID: 'y', order: 2 },
+      { type: 'line', label: 'Tokens', data: keys.map(k => t.get(k)), borderColor: '#4fd1c5', backgroundColor: 'rgba(79,209,197,.12)', fill: true, tension: .35, pointRadius: 0, borderWidth: 2, yAxisID: 'y1', order: 1 } ] },
+    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+        y: { beginAtZero: true, ticks: { callback: v => '$' + v } },
+        y1: { beginAtZero: true, position: 'right', grid: { display: false }, ticks: { callback: v => compact(v) } } },
+      plugins: { legend: { labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: x => x.datasetIndex ? ` Tokens: ${compact(x.raw)}` : ` Cost: ${usd(x.raw)}` } } } } });
+}
+
+const lvl = (v, max) => !v ? 0 : Math.min(4, 1 + Math.floor(Math.sqrt(v / max) * 3.999));
+const LV = ['rgba(255,255,255,.06)', 'rgba(224,122,95,.3)', 'rgba(224,122,95,.55)', 'rgba(232,110,130,.8)', '#ff8a6b'];
+document.head.insertAdjacentHTML('beforeend', `<style>${LV.map((c, i) => `.l${i}{background:${c}}`).join('')}</style>`);
+
+function yearHeat(rs, to) {
+  const end = parseDay(to), start = addDays(end, -364 - ((end.getDay() + 6) % 7)); // start on a Monday
+  const byDay = new Map(); for (const r of rs) byDay.set(r.day, (byDay.get(r.day) || 0) + r.c);
+  const max = Math.max(...byDay.values(), 1e-9);
+  let cells = '', months = '', yc = 0, yd = 0;
+  for (let d = start, i = 0; d <= end; d = addDays(d, 1), i++) {
+    const k = dk(d), v = byDay.get(k) || 0; if (v) { yc += v; yd++; }
+    cells += `<div class="cell l${lvl(v, max)}" title="${k}: ${usd(v)}"></div>`;
+    if (i % 7 === 0) months += `<span>${d.getDate() <= 7 ? d.toLocaleString(undefined, { month: 'short' }) : ''}</span>`;
+  }
+  $('year').innerHTML = cells; $('months').innerHTML = months;
+  $('yearSum').textContent = `${yd} active days · ${usd(yc)} in the last year`;
+}
+function hourHeat(rs) {
+  const g = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const r of rs) g[(r.d.getDay() + 6) % 7][r.d.getHours()]++;
+  const max = Math.max(...g.flat(), 1), names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  let h = '<span></span>' + Array.from({ length: 24 }, (_, i) => `<span style="text-align:center">${i % 3 ? '' : i}</span>`).join('');
+  g.forEach((row, w) => { h += `<span>${names[w]}</span>` + row.map((v, hr) => `<div class="cell l${lvl(v, max)}" title="${names[w]} ${pad(hr)}:00 · ${v} requests"></div>`).join(''); });
+  $('hours').innerHTML = h;
+}
+
+function setPreset(n) {
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.d === n));
+  const today = dk(new Date());
+  $('to').value = today;
+  $('from').value = n === '0' ? (R.length ? R[0].day : today) : dk(addDays(new Date(), 1 - n));
+  render();
+}
+
+// ---------- sample data (made up, seeded so it looks the same every time)
+function sampleData() {
+  let seed = 42; const rnd = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  const pick = w => { let x = rnd() * w.reduce((a, b) => a + b[1], 0); for (const [v, n] of w) if ((x -= n) < 0) return v; return w[0][0]; };
+  const d = { models: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1', 'claude-haiku-4-5'], projects: ['PlanetForge', 'NeonRoyale', 'my-api', 'dotfiles', 'Terrarium', 'blog'],
+    entries: ['claude-desktop', 'cli', 'claude-vscode'], tools: ['Bash', 'Read', 'Edit', 'Write', 'Grep', 'Glob', 'Agent', 'WebSearch', 'WebFetch', 'mcp__Claude_Browser__computer'], req: [], prompts: [],
+    src: 'sample data (made up)' };
+  const today = new Date(); let s = 0;
+  for (let back = 200; back >= 0; back--) {
+    const day = addDays(today, -back), wkend = day.getDay() % 6 === 0;
+    if (rnd() < (wkend ? .45 : .2) && back) continue;
+    for (let n = 1 + Math.floor(rnd() * 3.5); n--; s++) {
+      const m = pick([[0, 6], [1, 3], [2, 1], [3, 1]]), p = pick([[0, 4], [1, 3], [2, 3], [3, 1], [4, 2], [5, 1]]), e = pick([[0, 5], [1, 3], [2, 2]]);
+      let t = Math.floor(day.getTime() / 60000) + Math.floor((wkend ? 600 : 480) + rnd() * 840), ctx = 15000;
+      const reqs = 8 + Math.floor(rnd() * rnd() * 140), fast = m === 0 && rnd() < .15;
+      for (let k = 0; k < reqs; k++) {
+        if (k % 7 === 0) d.prompts.push([t, s]);
+        const w = Math.floor(rnd() * 9000), w1 = rnd() < .2 ? Math.floor(rnd() * 3000) : 0;
+        d.req.push([t, s, p, m, e, Math.floor(1 + rnd() * 40), Math.floor(80 + rnd() * rnd() * 4000), ctx, w, w1, fast ? 1 : 0,
+          Array.from({ length: Math.floor(rnd() * 2.4) }, () => pick([[0, 9], [1, 8], [2, 6], [3, 2], [4, 3], [5, 2], [6, 1], [7, .6], [8, .5], [9, .8]]))]);
+        ctx = Math.min(180000, ctx + w + w1); t += 1 + Math.floor(rnd() * 3);
+      }
+    }
+  }
+  return d;
+}
+
+// ---------- wiring
+$('pick').onclick = () => $('dir').click();
+$('dir').onchange = e => importFiles([...e.target.files]);
+$('sample').onclick = () => setData(sampleData(), false);
+$('clear').onclick = () => { try { localStorage.removeItem(KEY); } catch {} location.reload(); };
+$('presets').onclick = e => e.target.dataset.d && setPreset(e.target.dataset.d);
+$('gran').onclick = e => { if (!e.target.dataset.g) return; gran = e.target.dataset.g; document.querySelectorAll('#gran button').forEach(b => b.classList.toggle('on', b === e.target)); render(); };
+$('from').onchange = $('to').onchange = () => { document.querySelectorAll('#presets button').forEach(b => b.classList.remove('on')); render(); };
+
+async function walk(entry, out) {
+  if (entry.isFile) { if (entry.name.endsWith('.jsonl')) out.push(await new Promise((ok, no) => entry.file(ok, no))); return; }
+  const rd = entry.createReader(); let batch;
+  do { batch = await new Promise((ok, no) => rd.readEntries(ok, no)); for (const e of batch) await walk(e, out); } while (batch.length);
+}
+document.addEventListener('dragover', e => { e.preventDefault(); $('drop').classList.add('over'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) $('drop').classList.remove('over'); });
+document.addEventListener('drop', async e => {
+  e.preventDefault(); $('drop').classList.remove('over');
+  const files = []; status('Reading folder…');
+  for (const it of [...e.dataTransfer.items].map(i => i.webkitGetAsEntry()).filter(Boolean)) await walk(it, files);
+  importFiles(files);
+});
+
+try { const c = JSON.parse(localStorage.getItem(KEY)); if (c) setData(c, false); } catch {}
+</script>
+</body>
+</html>
