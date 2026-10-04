@@ -171,31 +171,57 @@ footer{color:var(--mut);font-size:12px;text-align:center;margin-top:20px}
     <h2>Most expensive sessions</h2>
     <div class="tablewrap"><table><thead><tr><th>Date</th><th>Project</th><th>Model</th><th class="r">Requests</th><th class="r">Tokens</th><th class="r">Cost</th></tr></thead><tbody id="sessions"></tbody></table></div>
   </div>
-  <footer>🔒 Parsed locally from your Claude Code transcripts · prices are Anthropic API list prices (USD) · <span id="src"></span></footer>
+  <footer>🔒 Parsed locally from your Claude Code transcripts · Anthropic API list prices (USD): <span id="psrc"></span> · <span id="src"></span></footer>
 </main>
 </div>
 
 <script>
-// ---------- pricing (USD / 1M tokens). [prefix, input, output, cacheRead?, fast?]. First prefix match wins.
+// ---------- pricing (USD / 1M tokens). Live prices from LiteLLM's public list win; this table is the fallback.
+// [prefix, input, output, cacheRead?, fastMultiplier?]. First prefix match wins.
 const PRICES = [
   ['claude-fable-5-1', 10, 50, 0.25],
   ['claude-fable-5',   10, 50, 1.00],
-  ['claude-opus-5-5',   4, 20, 0.20, [8, 40]],
+  ['claude-opus-5-5',   4, 20, 0.20, 2],
   ['claude-opus-5',     5, 25], ['claude-opus-4-8', 5, 25], ['claude-opus-4-7', 5, 25], ['claude-opus-4-6', 5, 25],
   ['claude-sonnet-5-5', 2, 10, 0.20],
   ['claude-sonnet-5',   2, 10],
   ['claude-sonnet-4-6', 3, 15],
   ['claude-haiku-4-5',  1, 5],
 ];
-const priceOf = m => PRICES.find(p => m.startsWith(p[0])) || null;
+const LIVE_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
+const PKEY = 'claudestats-prices-v1';
+let LIVE = null; // {at, prices: {model: {i,o,cr,w5,w1,fast}}}
+function priceOf(m) {
+  if (LIVE) {
+    const k = Object.keys(LIVE.prices).filter(k => m.startsWith(k)).sort((a, b) => b.length - a.length)[0];
+    if (k) return LIVE.prices[k];
+  }
+  const p = PRICES.find(p => m.startsWith(p[0])); if (!p) return null;
+  const [, i, o, cr, fast] = p;
+  return { i, o, cr: cr ?? i * 0.1, w5: i * 1.25, w1: i * 2, fast: fast || 1 };
+}
+async function loadLivePrices() {
+  try { LIVE = JSON.parse(localStorage.getItem(PKEY)); } catch {}
+  if (LIVE && Date.now() - LIVE.at < 864e5) return; // refresh once a day
+  try {
+    const j = await (await fetch(LIVE_URL)).json(), prices = {}, M = 1e6;
+    for (const [k, v] of Object.entries(j)) if (k.startsWith('claude-') && v.litellm_provider === 'anthropic' && v.input_cost_per_token) {
+      const i = v.input_cost_per_token * M;
+      prices[k] = { i, o: v.output_cost_per_token * M, cr: (v.cache_read_input_token_cost ?? v.input_cost_per_token * 0.1) * M,
+        w5: (v.cache_creation_input_token_cost ?? v.input_cost_per_token * 1.25) * M, w1: (v.cache_creation_input_token_cost_above_1hr ?? v.input_cost_per_token * 2) * M,
+        fast: v.provider_specific_entry?.fast || 1 };
+    }
+    if (!Object.keys(prices).length) return;
+    LIVE = { at: Date.now(), prices };
+    try { localStorage.setItem(PKEY, JSON.stringify(LIVE)); } catch {}
+  } catch {} // offline or blocked: keep cached or built-in prices
+}
 // returns [actual cost, cost if nothing had been cached]
 function costOf(r) {
   const p = priceOf(D.models[r.m]); if (!p) return [0, 0];
-  let [, inp, out, cr, fast] = p;
-  if (r.f && fast) [inp, out] = fast;
-  cr = cr ?? inp * 0.1;
-  const c = (r.i * inp + r.o * out + r.cr * cr + r.w5 * inp * 1.25 + r.w1 * inp * 2) / 1e6;
-  const raw = ((r.i + r.cr + r.w5 + r.w1) * inp + r.o * out) / 1e6;
+  const x = r.f ? p.fast : 1; // fast mode multiplies every token price
+  const c = (r.i * p.i + r.o * p.o + r.cr * p.cr + r.w5 * p.w5 + r.w1 * p.w1) * x / 1e6;
+  const raw = ((r.i + r.cr + r.w5 + r.w1) * p.i + r.o * p.o) * x / 1e6;
   return [c, raw];
 }
 
@@ -353,6 +379,7 @@ function render() {
   }).sort((a, b) => b.c - a.c).slice(0, 10);
   $('sessions').innerHTML = top.map(x => `<tr><td>${x.d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} <span class="sub">${pad(x.d.getHours())}:${pad(x.d.getMinutes())}</span></td><td>${esc(x.p)}</td><td>${esc(prettyModel(x.m))}</td><td class="r">${x.n}</td><td class="r">${compact(x.tok)}</td><td class="r"><b>${usd(x.c)}</b></td></tr>`).join('') || '<tr><td colspan="6" class="sub">Nothing in this range</td></tr>';
   $('meta').textContent = `${from} → ${to}`;
+  $('psrc').textContent = LIVE ? `live prices from LiteLLM, fetched ${new Date(LIVE.at).toLocaleString()}` : 'built-in prices (Sep 2026)';
 }
 
 function bucketKey(d) {
@@ -464,6 +491,7 @@ document.addEventListener('drop', async e => {
 });
 
 try { const c = JSON.parse(localStorage.getItem(KEY)); if (c) setData(c, false); } catch {}
+loadLivePrices().then(() => { if (!D) return; for (const r of R) [r.c, r.raw] = costOf(r); render(); });
 </script>
 </body>
 </html>

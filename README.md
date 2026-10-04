@@ -15,4 +15,6 @@ What it shows:
 
 The `.claude` folder is hidden on Windows: in the folder picker, paste `%USERPROFILE%\.claude` into the address bar and pick `projects`. The computed summary is cached in localStorage, so a reload doesn't need the folder again. There's also a "Load sample data" button with made-up data.
 
+Prices are pulled live (once a day) from [LiteLLM's public price list](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json), per model, including cache and fast-mode rates. If that can't be reached, a built-in table (Sep 2026 list prices) is used.
+
 Single `index.html`, no build step; Chart.js from cdnjs.
